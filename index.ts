@@ -79,6 +79,11 @@ const ConfigSchema = z
       .optional()
       .describe('Path to custom CA certificate for Elasticsearch'),
 
+    oauthToken: z
+        .string()
+        .optional()
+        .describe('oauthToken for Elasticsearch'),
+
     pathPrefix: z.string().optional().describe('Path prefix for Elasticsearch'),
 
     version: z
@@ -103,12 +108,14 @@ const ConfigSchema = z
         return data.password != null
       }
 
+      if (data.oauthToken != null) return true
+
       // No auth is also valid (for local development)
       return true
     },
     {
       message:
-        'Either ES_API_KEY or both ES_USERNAME and ES_PASSWORD must be provided, or no auth for local development',
+        'Either ES_OAUTH, ES_API_KEY or both ES_USERNAME and ES_PASSWORD must be provided, or no auth for local development',
       path: ['username', 'password']
     }
   )
@@ -117,12 +124,13 @@ type ElasticsearchConfig = z.infer<typeof ConfigSchema>
 
 export async function createElasticsearchMcpServer (config: ElasticsearchConfig): Promise<McpServer> {
   const validatedConfig = ConfigSchema.parse(config)
-  const { url, apiKey, username, password, caCert, version, pathPrefix, sslSkipVerify } = validatedConfig
+  const { url, apiKey, username, password, caCert, version, pathPrefix, sslSkipVerify, oauthToken } = validatedConfig
 
   const clientOptions: ClientOptions = {
     node: url,
     headers: {
-      'user-agent': `${product.name}/${product.version}`
+      'user-agent': `${product.name}/${product.version}`,
+      'Authorization': `Bearer ${oauthToken}`
     }
   }
 
@@ -523,6 +531,7 @@ const config: ElasticsearchConfig = {
   password: process.env.ES_PASSWORD,
   caCert: process.env.ES_CA_CERT,
   version: process.env.ES_VERSION,
+  oauthToken: process.env.ES_OAUTH,
   sslSkipVerify: process.env.ES_SSL_SKIP_VERIFY === '1' || process.env.ES_SSL_SKIP_VERIFY === 'true',
   pathPrefix: process.env.ES_PATH_PREFIX
 }
